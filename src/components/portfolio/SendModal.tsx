@@ -117,24 +117,29 @@ export function SendModal({
       const rawAmount = toTokenUnits(numeric, decimals);
       const amountBig = BigInt(rawAmount);
 
+      // viem's EIP1193Provider types eth_sendTransaction strictly as
+      // [ExactPartial<RpcTransactionRequest>] where every address/hex
+      // field is `0x${string}`. cleanRecipient is user input (plain
+      // string) so we cast it to the template-literal type after the
+      // earlier validation step has confirmed it matches 0x[hex]{40}.
       let txParams: {
-        from: string;
-        to: string;
-        data?: string;
-        value?: string;
+        from: `0x${string}`;
+        to: `0x${string}`;
+        data?: `0x${string}`;
+        value?: `0x${string}`;
       };
 
       if (isNative) {
         txParams = {
           from: wallet.address,
-          to: cleanRecipient,
-          value: `0x${amountBig.toString(16)}`,
+          to: cleanRecipient as `0x${string}`,
+          value: `0x${amountBig.toString(16)}` as `0x${string}`,
           data: withAttribution(),
         };
       } else {
         txParams = {
           from: wallet.address,
-          to: tokenAddr,
+          to: tokenAddr as `0x${string}`,
           data: withAttribution(encodeErc20Transfer(cleanRecipient, amountBig)),
         };
       }
