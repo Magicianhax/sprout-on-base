@@ -156,8 +156,7 @@ export default function LandingPage() {
           )}
         </div>
         <p className="text-center text-[11px] text-sprout-text-muted mt-5">
-          Powered by <span className="font-bold">Base</span> &amp;{" "}
-          <span className="font-bold">LI.FI</span>
+          Powered by <span className="font-bold">LI.FI</span>
         </p>
       </div>
 
