@@ -1,6 +1,6 @@
 // Base Builder Codes — ERC-8021 attribution suffix.
 //
-// We append DATA_SUFFIX to the `data` field of every eth_sendTransaction
+// We append a suffix to the `data` field of every eth_sendTransaction
 // so Base.dev can attribute the transaction to Sprout and we earn
 // referral fees on Base. Smart contracts ignore trailing bytes past
 // the ABI-encoded calldata, so this is safe to append to ANY tx,
@@ -17,7 +17,10 @@ import { Attribution } from "ox/erc8021";
 
 const RAW_CODE = process.env.NEXT_PUBLIC_BASE_BUILDER_CODE?.trim() || "";
 
-export const DATA_SUFFIX: `0x${string}` | "" = RAW_CODE
+// Resolved at module load. Kept internal — callers should always go
+// through withAttribution() so the empty-builder-code fallback is
+// handled in exactly one place.
+const DATA_SUFFIX: `0x${string}` | "" = RAW_CODE
   ? Attribution.toDataSuffix({ codes: [RAW_CODE] })
   : "";
 

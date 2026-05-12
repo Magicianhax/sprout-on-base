@@ -3,16 +3,20 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   useAccount,
+  useConfig,
   useConnect,
   useDisconnect,
+  usePublicClient,
   useSignMessage,
 } from "wagmi";
+import { getAccount } from "@wagmi/core";
 import { createSiweMessage, generateSiweNonce } from "viem/siwe";
 import { base } from "viem/chains";
 import {
   clearSession,
   loadSession,
   saveSession,
+  SESSION_TTL_MS,
   type Session,
 } from "./session";
 
@@ -27,12 +31,10 @@ import {
 // means the migration is one import-path swap per file instead of
 // a logic rewrite per file.
 
-// User shape mirrors @privy-io/react-auth's User just enough to keep
-// the existing call sites compiling. `email` is a vestigial field
-// from the multi-method login era — Base Account is wallet-only, so
-// at runtime it's always undefined. We expose it as optional so the
-// `user?.email?.address` accesses in Header and Settings type-check
-// and silently render nothing.
+// `email` is a vestigial field from the multi-method-login era —
+// Base Account is wallet-only, so at runtime it's always undefined.
+// We expose it as optional so the `user?.email?.address` accesses
+// in Header and Settings type-check and silently render nothing.
 export interface UsePrivyResult {
   ready: boolean;
   authenticated: boolean;
@@ -51,6 +53,8 @@ export function usePrivy(): UsePrivyResult {
   const { connectors, connectAsync } = useConnect();
   const { disconnectAsync } = useDisconnect();
   const { signMessageAsync } = useSignMessage();
+  const config = useConfig();
+  const publicClient = usePublicClient({ chainId: base.id });
 
   const [session, setSession] = useState<Session | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -69,27 +73,29 @@ export function usePrivy(): UsePrivyResult {
   const ready = hydrated && status !== "reconnecting" && status !== "connecting";
 
   // Authenticated = wallet connected AND a fresh SIWE signature exists
-  // for this exact address. If the user signed in then switched
-  // wallets, the session no longer matches and we treat them as
-  // logged out (forces a fresh sign-in).
+  // for this exact address AND the signature hasn't aged past TTL. The
+  // TTL check here (not just at load) means a tab left open past the
+  // 24h boundary flips back to logged-out on the next render.
   const authenticated =
     isConnected &&
     !!address &&
     !!session &&
-    session.address.toLowerCase() === address.toLowerCase();
+    session.address.toLowerCase() === address.toLowerCase() &&
+    Date.now() - session.signedAt < SESSION_TTL_MS;
 
   const login = useCallback(async () => {
-    // If wagmi already has a live connection (e.g. the user reloaded
-    // and we auto-reconnected via cookieStorage, but the SIWE session
-    // in localStorage has expired) we re-use that connection rather
-    // than calling connectAsync, which would throw "AlreadyConnected"
-    // on the second attempt.
+    // Read the live account snapshot — the values destructured at the
+    // top of this hook are captured in this useCallback closure and
+    // can be stale by the time the user clicks (wagmi may have
+    // completed a background reconnect since the last render).
+    const live = getAccount(config);
+
     let signer: `0x${string}` | undefined =
-      isConnected && address ? address : undefined;
+      live.isConnected && live.address ? live.address : undefined;
 
     if (!signer) {
-      // Pick baseAccount by name where possible; fall back to whatever
-      // connector wagmi exposes first. The provider.tsx config lists
+      // Pick baseAccount by id/name where possible; fall back to whatever
+      // connector wagmi exposes first. The provider config lists
       // baseAccount first, so connectors[0] is the right one even if
       // wagmi's connector.id naming changes between versions.
       const baseConnector =
@@ -107,12 +113,19 @@ export function usePrivy(): UsePrivyResult {
     }
 
     if (!signer) throw new Error("Wallet did not return an address.");
+    if (!publicClient) {
+      throw new Error(
+        "No Base RPC client available — cannot verify your wallet signature."
+      );
+    }
 
     // SIWE: ties the session to a specific address + timestamp. We
-    // don't ship the signature to a server — every later action is
-    // proven by its own on-chain signature — but we re-verify the
-    // SIWE signature client-side via viem to catch a misbehaving
-    // wallet that returns a fake address.
+    // don't ship the signature to a server (every on-chain action is
+    // its own proof of wallet control), but we DO verify the
+    // signature locally via viem's verifyMessage. viem handles both
+    // EOA (ECDSA recover) and smart-wallet (EIP-1271, ERC-6492)
+    // signatures transparently, so this catches a misbehaving
+    // connector that hands us a wrong address from connectAsync.
     const nonce = generateSiweNonce();
     const message = createSiweMessage({
       address: signer,
@@ -126,12 +139,22 @@ export function usePrivy(): UsePrivyResult {
       version: "1",
       statement: "Sign in to Sprout to manage your Base yield positions.",
     });
-    await signMessageAsync({ message });
+    const signature = await signMessageAsync({ message });
+    const valid = await publicClient.verifyMessage({
+      address: signer,
+      message,
+      signature,
+    });
+    if (!valid) {
+      throw new Error(
+        "Sign-in signature failed verification. Please reconnect your wallet and try again."
+      );
+    }
 
     const next: Session = { address: signer, signedAt: Date.now() };
     saveSession(next);
     setSession(next);
-  }, [connectors, connectAsync, signMessageAsync, isConnected, address]);
+  }, [config, connectors, connectAsync, signMessageAsync, publicClient]);
 
   const logout = useCallback(() => {
     clearSession();

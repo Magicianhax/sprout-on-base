@@ -13,28 +13,18 @@ import {
   type Client,
   type EIP1193Provider,
 } from "viem";
-import {
-  arbitrum,
-  base,
-  mainnet,
-  optimism,
-  polygon,
-} from "viem/chains";
+import { base } from "viem/chains";
 import { DEFAULT_SLIPPAGE } from "@/lib/constants";
 import { withAttribution } from "@/lib/attribution";
 
 // ── Chain mapping ────────────────────────────────────────────────────
-// viem's chain objects carry formatters, multicall addresses, etc. —
-// the SDK expects these via the wallet `Client`. Only the chains
-// Sprout actually supports are listed; any other chain Privy reports
-// is rejected before we try to build a walletClient for it.
+// sprout-base is single-chain. We keep the Record<number, Chain>
+// shape (rather than collapsing to a single constant) so the LI.FI
+// SDK's chainId callbacks have a uniform lookup path, and so a
+// future chain addition is one new entry rather than a refactor.
 
 const CHAINS_BY_ID: Record<number, Chain> = {
-  [mainnet.id]: mainnet,
   [base.id]: base,
-  [arbitrum.id]: arbitrum,
-  [optimism.id]: optimism,
-  [polygon.id]: polygon,
 };
 
 function chainForId(id: number): Chain | undefined {
@@ -42,22 +32,17 @@ function chainForId(id: number): Chain | undefined {
 }
 
 /**
- * Wrap Privy's EIP-1193 provider to intercept EIP-5792 batched-call
- * methods that Privy's embedded wallet doesn't implement cleanly.
- *
- * viem (and by extension @lifi/sdk) probes wallet_getCapabilities to
- * decide whether it can atomically batch approve + deposit via
- * wallet_sendCalls. Privy responds to that probe with its own
- * internal "Hardware wallets are not supported" rejection, which
- * viem surfaces as:
- *   [UnknownError] This Wallet does not support a capability that
- *   was not marked as optional.
- *
- * Returning an empty capabilities map tells viem "this wallet has
- * no special batching support" — SDK falls back to regular
- * eth_sendTransaction, which Privy's embedded wallet handles fine.
- * wallet_sendCalls is force-rejected in case viem ever skips the
- * capability check and attempts it anyway.
+ * Wrap the wallet connector's EIP-1193 provider to:
+ *   1. Short-circuit EIP-5792 batched-call probes that injected /
+ *      embedded wallets don't implement cleanly. viem (and the LI.FI
+ *      SDK on top of it) probes wallet_getCapabilities to decide
+ *      whether it can atomically batch approve + deposit via
+ *      wallet_sendCalls. Returning an empty capabilities map tells
+ *      viem "no special batching support", so the SDK falls back to
+ *      regular eth_sendTransaction — which every wallet handles fine.
+ *   2. Append the Base Builder Code ERC-8021 suffix to the calldata
+ *      of every eth_sendTransaction the SDK signs, so attribution
+ *      reaches base.dev without needing per-call-site changes.
  */
 function wrapProviderForSdk(provider: EIP1193Provider): EIP1193Provider {
   // Viem's EIP1193Provider types `request` as a heavy discriminated
@@ -84,13 +69,19 @@ function wrapProviderForSdk(provider: EIP1193Provider): EIP1193Provider {
       // (approvals, deposits, bridges, swaps) flows through here, so
       // appending the ERC-8021 suffix at this single point covers all
       // of them. Smart contracts ignore trailing bytes past the
-      // ABI-encoded calldata, so the append is safe for every call shape.
+      // ABI-encoded calldata, so the append is safe for every call
+      // shape. We rebuild the params array immutably so the caller's
+      // input is never mutated.
       if (args.method === "eth_sendTransaction" && Array.isArray(args.params)) {
-        const params = args.params as Array<{ data?: string; [k: string]: unknown }>;
-        if (params[0] && typeof params[0] === "object") {
-          params[0] = { ...params[0], data: withAttribution(params[0].data) };
+        const inParams = args.params as Array<{ data?: string; [k: string]: unknown }>;
+        const head = inParams[0];
+        if (head && typeof head === "object") {
+          const newParams = [
+            { ...head, data: withAttribution(head.data) },
+            ...inParams.slice(1),
+          ];
+          return loose.request({ ...args, params: newParams });
         }
-        return loose.request({ ...args, params });
       }
       return loose.request(args);
     },
@@ -136,10 +127,11 @@ function buildEvmProviderOptions(): EVMProviderOptions {
       if (!chain) {
         throw new Error(`Chain ${chainId} is not supported.`);
       }
-      // Ask Privy to switch first, then rebuild the viem walletClient
-      // bound to the new chain — viem's client caches its `chain`
-      // object, so reusing the old instance after a switch gives the
-      // SDK a client that still thinks it's on the previous chain.
+      // Ask the connector to switch first, then rebuild the viem
+      // walletClient bound to the new chain — viem's client caches
+      // its `chain` object, so reusing the old instance after a
+      // switch gives the SDK a client that still thinks it's on the
+      // previous chain.
       await wallet.switchChain(chainId);
       const rawProvider = (await wallet.getEthereumProvider()) as EIP1193Provider;
       const provider = wrapProviderForSdk(rawProvider);
@@ -216,9 +208,9 @@ export function configureLifiSdk(integrator: string): void {
 
 /**
  * Update the active wallet the SDK should use for signing. Called
- * whenever the Privy wallet instance changes (login, relogin, account
- * swap). Also re-binds the EVM provider's options so in-flight route
- * executions see the new wallet on their next step.
+ * whenever the wagmi connector account changes (login, relogin,
+ * account swap). Also re-binds the EVM provider's options so
+ * in-flight route executions see the new wallet on their next step.
  */
 export function setLifiWallet(wallet: ConnectedWallet | null): void {
   currentWallet = wallet;

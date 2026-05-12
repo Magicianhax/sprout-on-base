@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAccount, useSwitchChain } from "wagmi";
+import { base } from "viem/chains";
 import type { EIP1193Provider } from "viem";
 
 // Compatibility shim for @privy-io/react-auth's useWallets(). The
@@ -9,7 +10,7 @@ import type { EIP1193Provider } from "viem";
 // withdrawExecutor, SendModal) walks wallets[0] and reads:
 //
 //   wallet.address                — primary wallet address
-//   wallet.chainId                — number or CAIP-2 string
+//   wallet.chainId                — number
 //   wallet.switchChain(id)        — switch network
 //   wallet.getEthereumProvider()  — raw EIP-1193 provider
 //
@@ -43,12 +44,15 @@ export function useWallets(): { wallets: ConnectedWallet[] } {
       address,
       chainId: chainId ?? 0,
       switchChain: async (id: number) => {
-        // wagmi types chainId to the configured-chains union (just 8453
-        // here). Callers pass plain numbers (position.chainId etc.),
-        // and at runtime wagmi rejects anything not in the config —
-        // exactly the behaviour we want. The cast just bridges the
-        // type gap without weakening the runtime check.
-        await switchChainAsync({ chainId: id as 8453 });
+        // sprout-base only configures Base in wagmi. Reject any other
+        // chain up front with a clear message rather than letting the
+        // wagmi runtime error bubble up with its own opaque text.
+        if (id !== base.id) {
+          throw new Error(
+            `Chain ${id} is not supported in sprout-base — only Base mainnet (${base.id}).`
+          );
+        }
+        await switchChainAsync({ chainId: base.id });
       },
       getEthereumProvider: async () => {
         const provider = await connector.getProvider();

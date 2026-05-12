@@ -138,8 +138,8 @@ async function fetchChainBalances(
     }
   }
 
-  // Native — one eth_getBalance per chain. Use the symbol listed in
-  // TOKEN_ADDRESSES (ETH for 1/8453/42161/10, POL for 137).
+  // Native — one eth_getBalance per chain. sprout-base only has ETH
+  // on Base (8453) in TOKEN_ADDRESSES, so this loop iterates once.
   for (const native of natives) {
     const hex = await alchemyRpc<string>(rpcUrl, "eth_getBalance", [
       address,

@@ -36,7 +36,7 @@ import {
   loadRoute,
   saveRoute,
 } from "@/lib/lifi/routePersistence";
-import type { Vault } from "@/lib/types";
+import type { EthereumProvider, Vault } from "@/lib/types";
 
 // Deposit flow powered by LI.FI Composer via @lifi/sdk. Uses
 // getRoutes (/v1/advanced/routes) rather than getQuote (/v1/quote):
@@ -114,10 +114,6 @@ interface SourceProgress {
   // same-chain Composer Route that finishes the deposit).
   routes: RouteExtended[];
   placeholderLabel: string;
-}
-
-interface EthereumProvider {
-  request(args: { method: string; params?: unknown[] }): Promise<unknown>;
 }
 
 function scheduleResync(walletAddress: string): void {

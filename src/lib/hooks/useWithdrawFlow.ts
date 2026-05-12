@@ -198,10 +198,10 @@ export function useWithdrawFlow() {
 
         const vault = await resolveVault(position);
 
-        // Resolve target chain + token. Default to the vault's
-        // own chain + underlying (direct redeem path). If either
-        // differs, the executor skips the direct probe and goes
-        // straight to LI.FI via the `preferLifiSwap` flag.
+        // Resolve target chain + token. Default to the vault's own
+        // chain + underlying (direct redeem path). If either differs,
+        // the executor goes straight through LI.FI for the cross-chain
+        // / cross-token exit.
         const destChainId =
           options?.destinationChainId ?? position.chainId;
         const destSymbol =
@@ -221,7 +221,6 @@ export function useWithdrawFlow() {
           amount: options?.amount,
           toChainId: isCustomExit ? destChainId : undefined,
           toTokenAddress: isCustomExit ? destTokenAddress : undefined,
-          preferLifiSwap: isCustomExit,
           onConfirming: () => {
             safeSetState((s) => ({ ...s, phase: "confirming" }));
           },

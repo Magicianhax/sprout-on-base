@@ -54,10 +54,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <meta
-          name="talentapp:project_verification"
-          content="84c63c64fe80e869e4174e6cb0da0a437030b315c71af4ab030e62b26292a935e7a9c845736939fb739c8ccbd9928eb3209330b15d8084e2a736e94b9fa77279"
-        />
         {/* Static theme-init script served from /public — applies the
             dark class before React hydrates so the first paint matches
             the saved preference (no flash of light mode). */}

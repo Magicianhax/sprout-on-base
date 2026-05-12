@@ -19,7 +19,7 @@ import {
   firstFailureMessage,
   isSdkUserRejection,
 } from "@/lib/lifi/routeAdapter";
-import type { Position, Vault } from "@/lib/types";
+import type { EthereumProvider, Position, Vault } from "@/lib/types";
 
 // Function selectors
 const ASSET_SELECTOR = "0x38d52e0f"; // asset() — ERC4626
@@ -129,12 +129,6 @@ export interface WithdrawExecutorOptions {
    */
   toChainId?: number;
   toTokenAddress?: string;
-  /**
-   * @deprecated Kept for API compat with the old signature. The new
-   * priority always tries LI.FI first, so this flag no longer alters
-   * the flow. Safe to pass or omit.
-   */
-  preferLifiSwap?: boolean;
   /** Fires once the flow is about to start prompting the wallet. */
   onConfirming?: () => void;
 }
@@ -142,10 +136,6 @@ export interface WithdrawExecutorOptions {
 export interface WithdrawExecutorResult {
   txHash: string;
   isFullWithdrawal: boolean;
-}
-
-interface EthereumProvider {
-  request(args: { method: string; params?: unknown[] }): Promise<unknown>;
 }
 
 async function readBalance(

@@ -60,8 +60,7 @@ export function AboutModal({ open, onClose }: AboutModalProps) {
           <div className="mt-6 space-y-4">
             <p className="text-sm text-sprout-text-secondary leading-relaxed">
               Sprout is a savings app that happens to be DeFi. One-tap deposits
-              into audited yield vaults across Ethereum, Base, Arbitrum,
-              Optimism and Polygon — no jargon required.
+              into audited yield vaults on Base — no jargon required.
             </p>
 
             <div className="rounded-2xl bg-sprout-green-light/60 p-4">
@@ -75,11 +74,11 @@ export function AboutModal({ open, onClose }: AboutModalProps) {
                 </li>
                 <li>
                   <span className="font-semibold">LI.FI Composer</span> —
-                  one-click cross-chain deposits and withdrawals
+                  one-click vault deposits and withdrawals on Base
                 </li>
                 <li>
-                  <span className="font-semibold">Privy</span> — social login
-                  and embedded wallets
+                  <span className="font-semibold">Base Account</span> —
+                  passkey-based smart-wallet sign-in
                 </li>
                 <li>
                   <span className="font-semibold">Next.js + Tailwind</span>{" "}

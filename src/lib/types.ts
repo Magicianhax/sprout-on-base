@@ -1,3 +1,14 @@
+// Loose EIP-1193 provider shape used by raw eth_call / eth_sendTransaction
+// call sites (withdrawExecutor, useDepositFlow). Kept intentionally
+// looser than viem's full discriminated-union EIP1193Provider so the
+// `params` array can be typed pragmatically without narrowing every
+// method's payload. The wagmi-backed wallet shim returns viem's
+// strict type; callers cast down to this interface where they need
+// flexible params.
+export interface EthereumProvider {
+  request(args: { method: string; params?: unknown[] }): Promise<unknown>;
+}
+
 export interface UserPreferences {
   mode: "lite" | "pro";
   riskLevel: "low" | "medium" | "high";
