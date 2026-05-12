@@ -18,6 +18,8 @@ import {
   type WithdrawStep,
 } from "@/lib/withdrawPlanner";
 import type { Position, Vault } from "@/lib/types";
+import { sendBaseNotification } from "@/lib/notify";
+import { loadPreferences } from "@/stores/preferences";
 
 type Phase = "idle" | "planning" | "confirming" | "success" | "error";
 
@@ -208,6 +210,18 @@ export function useSmartWithdrawFlow() {
         scheduleResync(wa);
 
         safeSetState((s) => ({ ...s, phase: "success" }));
+
+        if (loadPreferences().notificationsEnabled) {
+          const amount = requestedUsd > 0
+            ? `$${requestedUsd.toFixed(2)} `
+            : "";
+          void sendBaseNotification({
+            walletAddress: wa,
+            title: "Withdrawal complete",
+            message: `Your ${amount}withdrawal is back in your wallet.`,
+            targetPath: "/portfolio",
+          });
+        }
       } catch (err) {
         console.error("[smart-withdraw] flow failed", err);
         const isUserReject =

@@ -37,6 +37,8 @@ import {
   saveRoute,
 } from "@/lib/lifi/routePersistence";
 import type { EthereumProvider, Vault } from "@/lib/types";
+import { sendBaseNotification } from "@/lib/notify";
+import { loadPreferences } from "@/stores/preferences";
 
 // Deposit flow powered by LI.FI Composer via @lifi/sdk. Uses
 // getRoutes (/v1/advanced/routes) rather than getQuote (/v1/quote):
@@ -696,6 +698,22 @@ export function useDepositFlow() {
           finalTxHash: finalHash,
           finalChainId,
         }));
+
+        // Base Notifications — fire-and-forget. Gated on the user's
+        // local preference; Base will additionally only deliver to
+        // wallets that have notifications enabled in Base App.
+        if (loadPreferences().notificationsEnabled) {
+          const apy = args.vault.analytics?.apy?.total;
+          const apyPart = typeof apy === "number" && apy > 0
+            ? `Earning ${apy.toFixed(2)}% APY on Base.`
+            : "Your funds are now earning yield on Base.";
+          void sendBaseNotification({
+            walletAddress: wallet.address,
+            title: "Deposit confirmed",
+            message: `${apyPart} Tap to view your positions.`,
+            targetPath: "/portfolio",
+          });
+        }
       } catch (err) {
         console.error("[deposit] flow failed", err);
         const message = isSdkUserRejection(err)

@@ -19,6 +19,8 @@ import { invalidateBalances } from "@/lib/hooks/useBalances";
 import { executeVaultWithdraw } from "@/lib/withdrawExecutor";
 import { friendlyErrorMessage } from "@/lib/lifi/routeAdapter";
 import type { Position, Vault } from "@/lib/types";
+import { sendBaseNotification } from "@/lib/notify";
+import { loadPreferences } from "@/stores/preferences";
 
 type Phase = "idle" | "quoting" | "confirming" | "success" | "error";
 
@@ -228,6 +230,16 @@ export function useWithdrawFlow() {
 
         markWithdrawn(position, wallet.address, isFullWithdrawal);
         safeSetState((s) => ({ ...s, phase: "success", txHash }));
+
+        if (loadPreferences().notificationsEnabled) {
+          const symbol = position.asset?.symbol ?? "funds";
+          void sendBaseNotification({
+            walletAddress: wallet.address,
+            title: "Withdrawal complete",
+            message: `Your ${symbol} is back in your wallet.`,
+            targetPath: "/portfolio",
+          });
+        }
       } catch (err) {
         console.error("[withdraw] flow failed", err);
         // UserRejectedError carries a clean message; other errors get

@@ -49,6 +49,26 @@ once with these fields:
 NEXT_PUBLIC_BASE_BUILDER_CODE=<paste-your-code-here>
 ```
 
+### 3b. (Optional) Paste the Base Notifications API key
+
+If you want Sprout to push "deposit confirmed" / "withdrawal complete" to
+users via Base App, grab an API key from base.dev > your project >
+Settings > API Key and add:
+
+```bash
+# .env.local — server-only
+BASE_API_KEY=<paste-your-key-here>
+```
+
+The notification path is gated twice:
+1. **Sprout side** — `usePreferences.notificationsEnabled` (toggled in
+   Settings). Off by default.
+2. **Base side** — only delivered to wallets that pinned the app in
+   Base App and enabled notifications there.
+
+Without `BASE_API_KEY` set, every deposit/withdraw still works; the
+in-app push is just skipped.
+
 Restart the dev server. `withAttribution()` now appends the ERC-8021 suffix
 to every `eth_sendTransaction` Sprout makes — including LI.FI-routed
 approvals, deposits, and bridges. If the env var is missing, the app still
