@@ -87,7 +87,7 @@ npm run dev
 | Smart withdraw planner | Sorts by APY + chain-gas penalty | Sorts by APY + balance |
 | Wallet stack | Privy (email/Google/X/wallet, EOA embedded wallet) | **wagmi + `@base-org/account`** (Sign In with Base, smart wallet) |
 | Auth flow | Privy login modal | **Sign In with Base** (passkey) + SIWE |
-| Surface | PWA | PWA + Base.dev-registered Base App |
+| Surface | PWA (installable on home screen) | Standard web app, Base.dev-registered |
 | Attribution | LI.FI 25 bps | LI.FI 25 bps **+ Base Builder Code** |
 
 ## Why this stack

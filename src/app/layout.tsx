@@ -3,15 +3,12 @@ import { Analytics } from "@vercel/analytics/next";
 import { WalletProvider } from "@/lib/wallet";
 import { LifiSdkProvider } from "@/components/providers/LifiSdkProvider";
 import { ThemeSync } from "@/components/providers/ThemeSync";
-import { ServiceWorkerRegister } from "@/components/providers/ServiceWorkerRegister";
-import { InstallPrompt } from "@/components/providers/InstallPrompt";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Sprout — Earn on Base",
   description:
     "A savings app on Base. One-tap deposits into the best Base yield vaults via LI.FI Earn.",
-  manifest: "/manifest.json",
   icons: {
     icon: [
       { url: "/icon-32.png", sizes: "32x32", type: "image/png" },
@@ -70,8 +67,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <WalletProvider>
           <LifiSdkProvider>
             <ThemeSync />
-            <ServiceWorkerRegister />
-            <InstallPrompt />
             {children}
           </LifiSdkProvider>
         </WalletProvider>

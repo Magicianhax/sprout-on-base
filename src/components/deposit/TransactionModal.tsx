@@ -110,9 +110,9 @@ export function TransactionModal({
         }
       `}</style>
 
-      {/* Backdrop — z-[65] sits above BottomNav (50), InstallPrompt
-          (55), and the other modal sheets (60) so nothing can ever
-          paint over this status dialog during an in-flight tx. */}
+      {/* Backdrop — z-[65] sits above BottomNav (50) and the other
+          modal sheets (60) so nothing can ever paint over this
+          status dialog during an in-flight tx. */}
       <div
         className="fixed inset-0 z-[65] flex items-center justify-center px-5 bg-black/40 backdrop-blur-sm backdrop-fade-in"
         aria-modal="true"

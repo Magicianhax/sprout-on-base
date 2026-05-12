@@ -38,7 +38,8 @@ Base Account auth needs no API key — it uses Coinbase's public infrastructure.
 | Wallet | Privy (email/Google/X + EOA) | **Base Account** (passkey-based smart wallet) via wagmi + `@base-org/account` |
 | Auth | Privy login modal | **Sign In with Base** (SIWE) |
 | Attribution | LI.FI integrator 25 bps | LI.FI 25 bps **+ Base Builder Code (ERC-8021)** |
-| Discovery | PWA only | PWA + Base.dev registration |
+| Surface | PWA (installable) | Standard web app, Base.dev-registered |
+| Discovery | PWA install + share link | Base.dev listing |
 
 Everything else — the hooks/cache architecture, the LI.FI Earn integration,
 the deposit/withdraw orchestration, the Lite/Pro mode toggle — is unchanged.

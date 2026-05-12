@@ -22,3 +22,5 @@ tsconfig.tsbuildinfo
 *.log
 build.log
 install.log
+
+.vercel
