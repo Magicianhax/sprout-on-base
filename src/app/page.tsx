@@ -133,13 +133,22 @@ export default function LandingPage() {
           users the wallet-recognition cue they're used to. */}
       <div className="relative px-5 pb-10 pt-4 landing-rise-delay-4">
         <div className="w-full max-w-[400px] mx-auto flex flex-col items-center gap-3">
-          <SignInWithBaseButton
-            colorScheme="light"
-            size="large"
-            variant="solid"
-            onClick={handleSignIn}
-            disabled={signingIn || !ready}
-          />
+          {/* SignInWithBaseButton v1.0.1 only accepts colorScheme +
+              onClick — no size/variant/disabled props yet. We wrap it
+              in a div that intercepts pointer events to act as our
+              disabled state while signing in or before wagmi is ready. */}
+          <div
+            className="w-full flex justify-center"
+            style={{
+              pointerEvents: signingIn || !ready ? "none" : "auto",
+              opacity: signingIn || !ready ? 0.6 : 1,
+            }}
+          >
+            <SignInWithBaseButton
+              colorScheme="light"
+              onClick={handleSignIn}
+            />
+          </div>
           {signInError && (
             <p className="text-center text-[12px] text-red-600 max-w-[320px]">
               {signInError}
