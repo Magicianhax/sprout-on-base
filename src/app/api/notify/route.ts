@@ -96,13 +96,14 @@ function parseBody(raw: unknown): NotifyBody | { error: string } {
 }
 
 function resolveAppUrl(request: NextRequest): string {
-  // Prefer an explicit env override (so preview deployments can match
-  // the production app_url Base has on file), fall back to the request
-  // origin. Base verifies the app_url against the registered project,
-  // so this must match the URL whose base:app_id meta tag was used to
-  // claim the listing.
+  // Prefer an explicit env override (so a deployment with both a
+  // custom domain AND the raw *.vercel.app domain pins one canonical
+  // value), fall back to the request origin. Base verifies app_url
+  // against the registered project, so this must match the URL whose
+  // base:app_id meta tag was used to claim the listing. Server-only —
+  // no NEXT_PUBLIC_ prefix needed.
   return (
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
+    process.env.APP_URL?.replace(/\/$/, "") ||
     request.nextUrl.origin
   );
 }
