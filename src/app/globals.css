@@ -1,0 +1,180 @@
+@import url('https://fonts.googleapis.com/css2?family=Gabarito:wght@400;500;600;700;800;900&family=Figtree:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-heading: "Gabarito", sans-serif;
+  --font-body: "Figtree", sans-serif;
+
+  --color-sprout-green-primary: #4CAF50;
+  --color-sprout-green-dark: #2E7D32;
+  --color-sprout-green-light: #E8F5E9;
+  --color-sprout-amber-warm: #FFF8E1;
+  --color-sprout-amber-dark: #B45309;
+  --color-sprout-red-stop: #EF4444;
+  --color-sprout-text-primary: #1a1a2e;
+  --color-sprout-text-secondary: #6B7280;
+  --color-sprout-text-muted: #9CA3AF;
+  --color-sprout-card: #FFFFFF;
+  --color-sprout-border: #E5E7EB;
+
+  --radius-card: 24px;
+  --radius-button: 18px;
+  --radius-pill: 20px;
+  --radius-input: 14px;
+
+  --shadow-card: 0 4px 24px rgba(76,175,80,0.1);
+  --shadow-subtle: 0 2px 12px rgba(0,0,0,0.04);
+  --shadow-glow: 0 4px 16px rgba(76,175,80,0.3);
+}
+
+body {
+  font-family: var(--font-body);
+  color: var(--color-sprout-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-sprout-card);
+}
+
+.bg-sprout-gradient {
+  background: linear-gradient(180deg, #E8F5E9 0%, #FFF8E1 40%, #FFFFFF 100%);
+}
+
+/* Phone-frame layout — constrain the app to a mobile width on every
+   viewport so desktop mirrors the native phone experience. `main` is
+   the per-page root; Header and BottomNav use centered fixed
+   positioning to sit inside the same frame. */
+main {
+  max-width: 480px;
+  margin-inline: auto;
+  position: relative;
+}
+
+@media (min-width: 520px) {
+  body {
+    background: linear-gradient(180deg, #e5e7eb 0%, #f3f4f6 100%) !important;
+  }
+  html.dark body {
+    background: linear-gradient(180deg, #020a07 0%, #04120c 100%) !important;
+  }
+}
+
+/* Skeleton shimmer — a soft gradient sweep that respects the active
+   theme via CSS variables below. */
+.sprout-shimmer {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--sprout-shimmer-base, #ECEEF1);
+}
+
+.sprout-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--sprout-shimmer-highlight, rgba(255, 255, 255, 0.65)) 50%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  animation: sprout-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes sprout-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+html.dark {
+  --sprout-shimmer-base: #17342B;
+  --sprout-shimmer-highlight: rgba(110, 231, 168, 0.10);
+}
+
+/* Dark mode — deep forest theme that mirrors the organic feel of the
+   light theme. Activated by `dark` class on <html>. Overrides sprout
+   tokens so every component that reads them flips automatically. */
+html.dark {
+  color-scheme: dark;
+  --color-sprout-green-primary: #6EE7A8;
+  --color-sprout-green-dark: #A7F3C9;
+  --color-sprout-green-light: #173E30;
+  --color-sprout-amber-warm: #2A2419;
+  --color-sprout-amber-dark: #FCD34D;
+  --color-sprout-text-primary: #ECFDF5;
+  --color-sprout-text-secondary: #C6D7CE;
+  --color-sprout-text-muted: #8FA89A;
+  --color-sprout-card: #102821;
+  --color-sprout-border: #1E3A30;
+
+  --shadow-card: 0 4px 28px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(110, 231, 168, 0.08);
+  --shadow-subtle: 0 2px 14px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 4px 20px rgba(110, 231, 168, 0.25);
+}
+
+html.dark,
+html.dark body {
+  background-color: #061812;
+  color: var(--color-sprout-text-primary);
+}
+
+/* Rich forest gradient with a subtle green glow up top */
+html.dark .bg-sprout-gradient {
+  background:
+    radial-gradient(ellipse 80% 40% at 50% 0%, rgba(110, 231, 168, 0.12) 0%, transparent 70%),
+    linear-gradient(180deg, #0A2418 0%, #0B1F18 35%, #061812 100%) !important;
+}
+
+/* Surfaces — unify hard-coded white/gray backgrounds to the card token */
+html.dark .bg-white {
+  background-color: var(--color-sprout-card) !important;
+}
+
+html.dark .bg-gray-50,
+html.dark .bg-gray-100 {
+  background-color: #17342B !important;
+}
+
+html.dark .bg-gray-200 {
+  background-color: #1F4236 !important;
+}
+
+html.dark .border-sprout-border,
+html.dark .border-gray-100,
+html.dark .border-gray-200 {
+  border-color: var(--color-sprout-border) !important;
+}
+
+/* Pastel tint cards (vault detail stats grid) — keep the hue identity
+   but deepen for dark surface */
+html.dark .bg-green-50  { background-color: #0E3324 !important; }
+html.dark .bg-amber-50  { background-color: #2E2416 !important; }
+html.dark .bg-blue-50   { background-color: #122A3F !important; }
+html.dark .bg-purple-50 { background-color: #25203A !important; }
+html.dark .bg-red-50    { background-color: #2C1618 !important; }
+
+html.dark .text-green-700, html.dark .text-green-800  { color: #86EFAC !important; }
+html.dark .text-amber-700, html.dark .text-amber-800  { color: #FCD34D !important; }
+html.dark .text-blue-700,  html.dark .text-blue-800   { color: #93C5FD !important; }
+html.dark .text-purple-700, html.dark .text-purple-800 { color: #C4B5FD !important; }
+html.dark .text-red-600 { color: #FCA5A5 !important; }
+
+/* Hard-coded neutral greys used in a few components (badges, modal
+   copy) — rescue them in dark mode so text isn't black-on-black.
+   Light theme is untouched. */
+html.dark .text-gray-400 { color: #8FA89A !important; }
+html.dark .text-gray-500 { color: #A3BDB0 !important; }
+html.dark .text-gray-600 { color: #C6D7CE !important; }
+html.dark .text-gray-700 { color: #DCE8E1 !important; }
+html.dark .text-gray-800 { color: #ECFDF5 !important; }
+html.dark .text-gray-900 { color: #ECFDF5 !important; }
+
+/* Inputs and other neutral surfaces that use inline hex or utility
+   classes we can't retroactively refactor */
+html.dark input::placeholder {
+  color: #6B8577;
+}
+html.dark input,
+html.dark textarea {
+  color: var(--color-sprout-text-primary);
+}

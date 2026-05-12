@@ -1,0 +1,24 @@
+node_modules/
+.next/
+.env.local
+.env*.local
+
+# Local tooling / helper scripts — not part of the project
+setup-fast-cache.cmd
+
+# AI assistant context files — kept out of the repo so they don't
+# leak local workflow notes or override downstream contributors'
+# own AI configs.
+AGENTS.md
+CLAUDE.md
+.claude/
+
+# TypeScript incremental build artifact
+tsconfig.tsbuildinfo
+
+.vercel
+
+# Local debug logs (from npm/build attempts)
+*.log
+build.log
+install.log
