@@ -79,15 +79,33 @@ export function usePrivy(): UsePrivyResult {
     session.address.toLowerCase() === address.toLowerCase();
 
   const login = useCallback(async () => {
-    // Prefer baseAccount; fall back to whatever connector is available.
-    const baseConnector =
-      connectors.find((c) => c.id === "baseAccount") ?? connectors[0];
-    if (!baseConnector) {
-      throw new Error("No wallet connector available.");
+    // If wagmi already has a live connection (e.g. the user reloaded
+    // and we auto-reconnected via cookieStorage, but the SIWE session
+    // in localStorage has expired) we re-use that connection rather
+    // than calling connectAsync, which would throw "AlreadyConnected"
+    // on the second attempt.
+    let signer: `0x${string}` | undefined =
+      isConnected && address ? address : undefined;
+
+    if (!signer) {
+      // Pick baseAccount by name where possible; fall back to whatever
+      // connector wagmi exposes first. The provider.tsx config lists
+      // baseAccount first, so connectors[0] is the right one even if
+      // wagmi's connector.id naming changes between versions.
+      const baseConnector =
+        connectors.find(
+          (c) =>
+            c.id === "baseAccount" ||
+            c.id === "baseAccountSDK" ||
+            c.name === "Base Account"
+        ) ?? connectors[0];
+      if (!baseConnector) {
+        throw new Error("No wallet connector available.");
+      }
+      const result = await connectAsync({ connector: baseConnector });
+      signer = result.accounts[0];
     }
 
-    const result = await connectAsync({ connector: baseConnector });
-    const signer = result.accounts[0];
     if (!signer) throw new Error("Wallet did not return an address.");
 
     // SIWE: ties the session to a specific address + timestamp. We
@@ -113,7 +131,7 @@ export function usePrivy(): UsePrivyResult {
     const next: Session = { address: signer, signedAt: Date.now() };
     saveSession(next);
     setSession(next);
-  }, [connectors, connectAsync, signMessageAsync]);
+  }, [connectors, connectAsync, signMessageAsync, isConnected, address]);
 
   const logout = useCallback(() => {
     clearSession();

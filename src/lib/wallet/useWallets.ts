@@ -43,7 +43,12 @@ export function useWallets(): { wallets: ConnectedWallet[] } {
       address,
       chainId: chainId ?? 0,
       switchChain: async (id: number) => {
-        await switchChainAsync({ chainId: id });
+        // wagmi types chainId to the configured-chains union (just 8453
+        // here). Callers pass plain numbers (position.chainId etc.),
+        // and at runtime wagmi rejects anything not in the config —
+        // exactly the behaviour we want. The cast just bridges the
+        // type gap without weakening the runtime check.
+        await switchChainAsync({ chainId: id as 8453 });
       },
       getEthereumProvider: async () => {
         const provider = await connector.getProvider();

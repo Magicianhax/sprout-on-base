@@ -157,8 +157,9 @@ async function walletClientForActiveChain(): Promise<Client | null> {
   if (!wallet) return null;
   const rawProvider = (await wallet.getEthereumProvider()) as EIP1193Provider;
   const provider = wrapProviderForSdk(rawProvider);
-  // Read chain from the provider, not from `wallet.chainId`, because
-  // Privy sometimes reports a stale chainId for a tick after a switch.
+  // Read chain from the provider rather than wallet.chainId — wagmi
+  // sometimes reports a stale chainId for a tick after a switch, and
+  // the on-the-wire eth_chainId is always authoritative.
   let chain: Chain | undefined;
   try {
     const hex = (await provider.request({ method: "eth_chainId" })) as string;
@@ -167,13 +168,10 @@ async function walletClientForActiveChain(): Promise<Client | null> {
     chain = undefined;
   }
   if (!chain) {
-    // Fall back to whatever Privy claims; the SDK's switchChain hook
-    // will correct if needed.
-    const parsed =
-      typeof wallet.chainId === "string"
-        ? Number(wallet.chainId.split(":").pop())
-        : Number(wallet.chainId);
-    chain = chainForId(parsed) ?? base;
+    // Fall back to the shim's reported chainId. It's a number from
+    // wagmi (the upstream Privy version was a CAIP-2 string — the
+    // dual-shape branch from sprout/ is no longer needed here).
+    chain = chainForId(Number(wallet.chainId)) ?? base;
   }
   return createWalletClient({
     account: wallet.address as `0x${string}`,
