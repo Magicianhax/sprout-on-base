@@ -45,10 +45,25 @@ interface PartialWithdrawModalProps {
   onClose: () => void;
   onConfirm: (
     position: Position,
-    amount: number,
+    /**
+     * Underlying-token amount to withdraw, capped to 4 decimal places.
+     * `undefined` is the "full exit" signal — the executor uses the raw
+     * on-chain share bigint via shareBalanceRaw / balanceOf, completely
+     * bypassing float math (which would otherwise overshoot the
+     * available shares for tokens with >6 decimals of precision).
+     */
+    amount: number | undefined,
     destinationChainId: number,
     outputTokenSymbol: string
   ) => void;
+}
+
+// Truncate (not round) a float to 4 decimal places. We use floor so
+// the displayed/preset values can never exceed the actual on-chain
+// balance, even when the source float has drifted up from precision
+// loss in parseFloat.
+function floor4(value: number): number {
+  return Math.floor(value * 1e4) / 1e4;
 }
 
 export function PartialWithdrawModal({
@@ -58,6 +73,10 @@ export function PartialWithdrawModal({
   onConfirm,
 }: PartialWithdrawModalProps) {
   const [amount, setAmount] = useState("");
+  // True when the input was populated by the MAX button and the user
+  // hasn't typed since. We use this to signal "full exit" to the
+  // executor so it can take the raw share balance directly.
+  const [isFullExit, setIsFullExit] = useState(false);
   const [destinationChainId, setDestinationChainId] = useState<number>(
     position?.chainId ?? 8453
   );
@@ -111,7 +130,10 @@ export function PartialWithdrawModal({
 
   useEffect(() => {
     if (open && position) {
-      setAmount(String(maxAmount));
+      // Default to MAX on open — same UX as before but flagged so
+      // confirm uses the raw share path.
+      setAmount(String(floor4(maxAmount)));
+      setIsFullExit(true);
       // Default destination: the vault's own chain + underlying.
       // Zero bridge cost and the most common case — user can
       // switch from either dropdown.
@@ -122,6 +144,7 @@ export function PartialWithdrawModal({
     }
     if (!open) {
       setAmount("");
+      setIsFullExit(false);
     }
   }, [open, position, maxAmount]);
 
@@ -167,27 +190,48 @@ export function PartialWithdrawModal({
   const partialCustomBlocked = !isFullWithdrawal && isCustomExit;
 
   function setPercent(pct: number) {
-    // MAX must pass the exact balance precision so the executor's
-    // isFullWithdrawal threshold catches it and routes through the
-    // ERC4626 redeem(shares) path — which uses the raw share bigint
-    // (shareBalanceRaw / on-chain balanceOf) and is free of any
-    // float→bigint drift. toFixed(6) rounds, which silently exceeds
-    // the actual balance for tokens with >6 decimals of precision
-    // in their underlying amount (anything non-stable).
+    // MAX flips the full-exit flag so confirm passes amount=undefined
+    // and the executor takes the raw share bigint — bypasses float
+    // entirely and is the only path that's guaranteed not to overshoot
+    // the on-chain balance for high-decimal tokens.
     //
-    // Lower percents floor to 6 dp so the displayed input never
-    // overshoots maxAmount even when float math drifts.
+    // Lower percents floor to 4 dp (matching the input cap below) so
+    // the displayed value can never exceed maxAmount.
     if (pct >= 0.999) {
-      setAmount(String(maxAmount));
+      setAmount(String(floor4(maxAmount)));
+      setIsFullExit(true);
       return;
     }
-    const value = Math.floor(maxAmount * pct * 1e6) / 1e6;
+    const value = Math.floor(maxAmount * pct * 1e4) / 1e4;
     setAmount(String(value));
+    setIsFullExit(false);
+  }
+
+  // Restrict typed input to ≤ 4 decimal places. We do this here rather
+  // than via input[step=0.0001] because Safari ignores step on type=
+  // number, and the precision cap is the load-bearing safety net
+  // against float→bigint drift further down the pipe.
+  function handleAmountChange(next: string) {
+    setIsFullExit(false);
+    if (next === "" || next === ".") {
+      setAmount(next);
+      return;
+    }
+    // Allow digits + at most one dot, with at most 4 fractional digits.
+    if (!/^\d*\.?\d{0,4}$/.test(next)) return;
+    setAmount(next);
   }
 
   function handleConfirm() {
-    if (!validAmount || !position) return;
-    if (partialCustomBlocked) return;
+    if (!position) return;
+    if (partialCustomBlocked && !isFullExit) return;
+    if (isFullExit) {
+      // amount=undefined tells the executor "take the whole position
+      // via the raw-shares redeem path".
+      onConfirm(position, undefined, destinationChainId, outputSymbol);
+      return;
+    }
+    if (!validAmount) return;
     onConfirm(position, numericAmount, destinationChainId, outputSymbol);
   }
 
@@ -245,11 +289,11 @@ export function PartialWithdrawModal({
           <div className="bg-sprout-green-light/40 rounded-2xl px-4 py-3">
             <div className="flex items-baseline justify-center gap-2">
               <input
-                type="number"
+                type="text"
                 inputMode="decimal"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0.00"
+                onChange={(e) => handleAmountChange(e.target.value)}
+                placeholder="0.0000"
                 className="flex-1 min-w-0 bg-transparent text-3xl font-heading font-bold text-sprout-text-primary outline-none placeholder:text-sprout-text-muted text-center"
               />
             </div>
@@ -259,7 +303,7 @@ export function PartialWithdrawModal({
           </div>
 
           <p className="text-center text-[11px] text-sprout-text-muted mt-2">
-            Balance: {maxAmount.toFixed(6)} {position.asset.symbol}
+            Balance: {floor4(maxAmount).toFixed(4)} {position.asset.symbol}
           </p>
 
           {/* Presets */}
@@ -418,10 +462,10 @@ export function PartialWithdrawModal({
 
           <Button
             className="w-full mt-5"
-            disabled={!validAmount || partialCustomBlocked}
+            disabled={(!validAmount && !isFullExit) || (partialCustomBlocked && !isFullExit)}
             onClick={handleConfirm}
           >
-            {isFullWithdrawal ? "Withdraw all" : "Withdraw"}
+            {isFullExit || isFullWithdrawal ? "Withdraw all" : "Withdraw"}
           </Button>
 
           <p className="text-center text-[11px] text-sprout-text-muted mt-3">

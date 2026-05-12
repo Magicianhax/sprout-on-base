@@ -115,7 +115,14 @@ const subscribers = new Map<string, Set<(positions: Position[]) => void>>();
 // either the vaultAddress (when we have it) or an asset-address
 // fallback for legacy callers.
 const tombstones = new Map<string, number>();
-const TOMBSTONE_TTL_MS = 120_000;
+// Bumped from 2 min → 5 min. LI.FI's /positions indexer can lag the
+// chain by 2-3 minutes after a withdraw under load; the old 2 min TTL
+// would expire before the indexer caught up, resurrecting a withdrawn
+// position in the UI until the next reload. 5 min is well past the
+// observed worst case while staying short enough that a re-deposit
+// into the same vault (which clears the tombstone explicitly) isn't
+// blocked by stale state.
+const TOMBSTONE_TTL_MS = 300_000;
 
 function tombstoneKey(
   address: string,
@@ -275,16 +282,28 @@ async function augmentWithOnChainHoldings(
     else byChain.set(v.chainId, [v]);
   }
 
-  // Index what LI.FI already reported by vault address so we
-  // don't double-count — LI.FI positions that have been
-  // decorated with a vaultAddress win on conflicts, and any
-  // share-balance we find on-chain for those just updates
-  // `shareBalanceRaw` so withdraw has a cached redeem amount.
+  // Index what LI.FI already reported so the Tier-2 augmenter can
+  // fold its on-chain share balance back into the existing entry
+  // instead of pushing a synthetic duplicate.
+  //
+  // Two keys:
+  //   1. vaultAddress (precise) — preferred when LI.FI's position has
+  //      been decorated with a matching vault from the catalog
+  //   2. (chainId, protocolName, asset.address) — fallback for LI.FI
+  //      positions where the vault matcher couldn't resolve the
+  //      address (mismatched naming, vault not yet in the cache).
+  //      Without this fallback, the augmenter sees no match and pushes
+  //      a synthetic copy → user sees the same position twice.
   const lifiByVault = new Map<string, number>();
+  const lifiByProtoAsset = new Map<string, number>();
   existing.forEach((p, idx) => {
     if (p.vaultAddress) {
       lifiByVault.set(p.vaultAddress.toLowerCase(), idx);
     }
+    lifiByProtoAsset.set(
+      `${p.chainId}:${p.protocolName.toLowerCase()}:${p.asset.address.toLowerCase()}`,
+      idx
+    );
   });
 
   const perChainHeld = await Promise.all(
@@ -310,14 +329,20 @@ async function augmentWithOnChainHoldings(
       if (!underlying) continue;
 
       const key = vault.address.toLowerCase();
-      const existingIdx = lifiByVault.get(key);
+      const existingIdx =
+        lifiByVault.get(key) ??
+        lifiByProtoAsset.get(
+          `${vault.chainId}:${vault.protocol.name.toLowerCase()}:${underlying.address.toLowerCase()}`
+        );
 
       if (existingIdx !== undefined) {
-        // Already on the list — just fold in the raw share
-        // balance so executeVaultWithdraw doesn't have to
-        // re-read it later.
+        // Already on the list — just fold in the raw share balance
+        // (and stamp the vaultAddress while we're at it, in case the
+        // LI.FI position came in without one) so executeVaultWithdraw
+        // can use the cached redeem amount instead of an extra RPC.
         result[existingIdx] = {
           ...result[existingIdx],
+          vaultAddress: result[existingIdx].vaultAddress ?? vault.address,
           shareBalanceRaw: entry.shareBalance,
         };
         continue;
@@ -363,7 +388,44 @@ async function augmentWithOnChainHoldings(
     (a, b) =>
       parseFloat(b.balanceUsd || "0") - parseFloat(a.balanceUsd || "0")
   );
-  return result;
+
+  // Final dedupe pass — collapse any pair of positions that resolve
+  // to the same (chain, protocol, asset) tuple or the same vault
+  // address. We keep the FIRST occurrence (highest USD value after
+  // the sort above) and merge `shareBalanceRaw` + `vaultAddress`
+  // from later duplicates so withdraw still has the on-chain data.
+  const seen = new Set<string>();
+  const deduped: Position[] = [];
+  for (const p of result) {
+    const protoKey = `${p.chainId}:${p.protocolName.toLowerCase()}:${p.asset.address.toLowerCase()}`;
+    const vaultKey = p.vaultAddress ? `v:${p.chainId}:${p.vaultAddress.toLowerCase()}` : null;
+    if (seen.has(protoKey) || (vaultKey && seen.has(vaultKey))) {
+      // Merge useful fields back into the kept entry so we don't lose
+      // share data when a later duplicate had it and the earlier
+      // entry didn't.
+      const keepIdx = deduped.findIndex(
+        (k) =>
+          (k.chainId === p.chainId &&
+            k.protocolName.toLowerCase() === p.protocolName.toLowerCase() &&
+            k.asset.address.toLowerCase() === p.asset.address.toLowerCase()) ||
+          (vaultKey &&
+            k.vaultAddress?.toLowerCase() === p.vaultAddress?.toLowerCase())
+      );
+      if (keepIdx >= 0) {
+        deduped[keepIdx] = {
+          ...deduped[keepIdx],
+          vaultAddress: deduped[keepIdx].vaultAddress ?? p.vaultAddress,
+          shareBalanceRaw:
+            deduped[keepIdx].shareBalanceRaw ?? p.shareBalanceRaw,
+        };
+      }
+      continue;
+    }
+    seen.add(protoKey);
+    if (vaultKey) seen.add(vaultKey);
+    deduped.push(p);
+  }
+  return deduped;
 }
 
 function applyTombstones(
