@@ -167,7 +167,21 @@ export function PartialWithdrawModal({
   const partialCustomBlocked = !isFullWithdrawal && isCustomExit;
 
   function setPercent(pct: number) {
-    const value = Number((maxAmount * pct).toFixed(6));
+    // MAX must pass the exact balance precision so the executor's
+    // isFullWithdrawal threshold catches it and routes through the
+    // ERC4626 redeem(shares) path — which uses the raw share bigint
+    // (shareBalanceRaw / on-chain balanceOf) and is free of any
+    // float→bigint drift. toFixed(6) rounds, which silently exceeds
+    // the actual balance for tokens with >6 decimals of precision
+    // in their underlying amount (anything non-stable).
+    //
+    // Lower percents floor to 6 dp so the displayed input never
+    // overshoots maxAmount even when float math drifts.
+    if (pct >= 0.999) {
+      setAmount(String(maxAmount));
+      return;
+    }
+    const value = Math.floor(maxAmount * pct * 1e6) / 1e6;
     setAmount(String(value));
   }
 
