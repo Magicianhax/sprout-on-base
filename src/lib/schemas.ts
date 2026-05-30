@@ -43,7 +43,13 @@ function isVaultAnalytics(v: unknown): boolean {
   const apy = v.apy;
   const tvl = v.tvl;
   if (!isObject(apy) || !isNumber(apy.total)) return false;
-  if (!isObject(tvl) || !isString(tvl.usd)) return false;
+  // tvl.usd was a string in the original Earn API; as of mid-2026 it
+  // comes back as a number. Accept either — isVaultsResponse coerces
+  // it to a string after validation so the Vault type contract (and
+  // every consumer that expects a string) keeps working.
+  if (!isObject(tvl) || (!isString(tvl.usd) && !isNumber(tvl.usd))) {
+    return false;
+  }
   return true;
 }
 
@@ -66,6 +72,15 @@ export function isVaultsResponse(v: unknown): v is VaultsResponse {
   // Drop malformed entries instead of failing the whole page — earn API
   // occasionally returns vaults with missing analytics for fresh pools.
   v.data = v.data.filter(isVault);
+  // Coerce the now-numeric tvl.usd back to the string our Vault type
+  // and downstream consumers expect. Done here, once, so no consumer
+  // needs to know the upstream type flipped.
+  for (const vault of v.data as Vault[]) {
+    const tvl = vault.analytics?.tvl as { usd?: unknown } | undefined;
+    if (tvl && typeof tvl.usd === "number") {
+      tvl.usd = String(tvl.usd);
+    }
+  }
   if (v.nextCursor !== undefined && !isString(v.nextCursor)) return false;
   return true;
 }
