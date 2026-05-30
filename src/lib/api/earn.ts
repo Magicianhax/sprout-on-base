@@ -8,6 +8,7 @@ import type {
   VaultsResponse,
   Chain,
   PositionsResponse,
+  UnderlyingToken,
 } from "@/lib/types";
 import {
   ApiShapeError,
@@ -26,6 +27,42 @@ async function getJson(url: string, endpoint: string): Promise<unknown> {
   return res.json().catch(() => {
     throw new ApiShapeError(endpoint);
   });
+}
+
+// ── Upstream shape normalisation ─────────────────────────────────────
+// Mid-2026 the LI.FI Earn API made two breaking changes:
+//   1. /v1/vaults and /positions return BARE ARRAYS, not { data } /
+//      { positions } wrappers, and there's no more cursor pagination
+//      (one request with a high `limit` returns the whole set).
+//   2. The vault's underlying-token field was renamed `underlyingTokens`
+//      → `tokens` (plus a singular `token`).
+// We absorb both here so the ~6 downstream consumers that read
+// `vault.underlyingTokens` and the `{ data }` / `{ positions }`
+// wrappers keep working without edits.
+
+function normalizeVault(raw: unknown): Vault {
+  const v = raw as Record<string, unknown>;
+  const underlyingTokens = (
+    Array.isArray(v.underlyingTokens) && v.underlyingTokens.length
+      ? v.underlyingTokens
+      : Array.isArray(v.tokens) && v.tokens.length
+        ? v.tokens
+        : v.token
+          ? [v.token]
+          : []
+  ) as UnderlyingToken[];
+  return { ...(v as Vault), underlyingTokens };
+}
+
+function normalizeVaultsResponse(json: unknown): VaultsResponse {
+  const arr: unknown[] = Array.isArray(json)
+    ? json
+    : ((json as { data?: unknown[] }).data ?? []);
+  const data = arr.map(normalizeVault);
+  const nextCursor = Array.isArray(json)
+    ? undefined
+    : (json as { nextCursor?: string }).nextCursor;
+  return { data, nextCursor, total: data.length };
 }
 
 // Raw fetch — returns the API response as-is without any client-side filter.
@@ -52,7 +89,7 @@ async function fetchVaultsRaw(params?: {
   if (!isVaultsResponse(json)) {
     throw new ApiShapeError("vaults");
   }
-  return json;
+  return normalizeVaultsResponse(json);
 }
 
 export async function fetchVaults(params?: {
@@ -233,5 +270,10 @@ export async function fetchPositions(address: string): Promise<PositionsResponse
   if (!isPositionsResponse(json)) {
     throw new ApiShapeError("positions");
   }
-  return json;
+  // Earn API now returns a bare array; older shape wrapped it as
+  // { positions }. Normalise to the wrapped form the cache expects.
+  const positions = Array.isArray(json)
+    ? json
+    : ((json as PositionsResponse).positions ?? []);
+  return { positions } as PositionsResponse;
 }
